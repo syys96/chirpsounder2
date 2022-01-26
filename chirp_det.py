@@ -3,6 +3,11 @@
 # data format agnostic generic chirp detector
 # juha vierinen 2020
 #
+
+# 我现在就觉得 这个算法就TM纯粹扯淡 我甚至都怀疑作者放出来的是假代码
+# 自己写一个试试 分析用thor.py 接收到的数据 首先做小波 看是不是接收到了阶梯状的频率信号
+# 然后在试试用我之前写的filter去识别 看能不能识别出来
+
 import numpy as n
 import argparse
 import scipy.signal as ss
@@ -65,9 +70,11 @@ class chirp_matched_filter_bank:
         # create chirp signal vectors
         # centered around zero frequency
         self.chirps=[]
+        # 一个单峰的分布
         self.wf=n.array(ss.hann(self.conf.n_samples_per_block),dtype=n.float32)
         for cr in self.conf.chirp_rates:
             print("creating filter with chirp-rate %1.2f kHz/s"%(cr/1e3))
+            # 这里乘的是共轭 相当于把扫频带来的相位去掉 得到一个信号开始时频率的单频信号
             chirp_vec=n.array(self.wf*n.conj(self.chirpf(cr=cr)))
             self.chirps.append(chirp_vec)
         self.n_chirps=len(self.chirps)
@@ -80,6 +87,12 @@ class chirp_matched_filter_bank:
         sr=self.conf.sample_rate
         f0=0.0
         tv=n.arange(L,dtype=n.float64)/float(sr)
+        # 从数据头开始的时间：dt
+        # 我一直觉得这个有问题
+        # phi = (w0 + alpha * dt) * (t0 + dt)
+        # dphi = phi - w0*(t0+dt) = alpha*dt^2+alpha*dt*t0
+        # 而这里是             dphi = alpha*dt^2/2
+        # 这里不仅少一项，有一项还除了2 那么他最后识别出来的到底是什么？ 为什么还能识别出来？
         dphase=0.5*tv**2*cr*2*n.pi
         chirp=n.exp(1j*n.mod(dphase,2*n.pi))*n.exp(1j*2*n.pi*f0*tv)
         return(n.array(chirp,dtype=n.complex64))
@@ -100,6 +113,7 @@ class chirp_matched_filter_bank:
             exit(0)
         
         # whiten noise with a regularized filter
+        # 这不行吧 归一化了整个频谱都变了啊 这。。。
         Z=fft(self.wf*z)
         z=ifft(Z/(n.abs(Z)+1e-9))
         
@@ -136,8 +150,11 @@ class chirp_matched_filter_bank:
             # this is the center frequency of the dechirped signal
             # corresponds to the instantaneous
             # chirp frequency at the leading edge of the signal
+            # 这不对吧 fvec可是加了个fs/2的 这样就把原来0-fs/2变成fs/2-fs去了
+            # 这怎么行呢 fs/2以上的都是不靠谱的吧
             f0=self.conf.fvec[mi]
             # clear region around detection
+            # 这里清不清空又怎么样 后面又没用这个变量了 扯淡
             mf_p[n.max([0,mi-self.conf.mfsi]):n.min([mi+self.conf.mfsi,n_samps-1])]=0.0
             # this is the chirp rate we've detected
             detected_chirp_rate=self.conf.chirp_rates[mf_chirp_rate_idx[mi]]
