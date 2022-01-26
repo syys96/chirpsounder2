@@ -80,6 +80,7 @@ class chirp_config:
             
         # the minimum distance in frequency between detections
         # (avoid multiple detections of the same chirp)
+        # 是这个意思啊
         self.minimum_frequency_spacing=json.loads(c["config"]["minimum_frequency_spacing"])
         self.df=(float(self.sample_rate)/float(self.n_samples_per_block))
         self.mfsi=int(self.minimum_frequency_spacing/self.df) # minimum spacing of detections in fft bins
@@ -88,7 +89,10 @@ class chirp_config:
         self.max_simultaneous_detections=json.loads(c["config"]["max_simultaneous_detections"])
         # the smallest normalized snr that is detected
         self.threshold_snr=json.loads(c["config"]["threshold_snr"])
-        
+
+        # [0->fs/2,-fs/2-0] -->> [-fs/2->0->fs/2] -->> [0->fs]
+        # 这样不对吧 频率的位置都变了啊 这样有问题吧
+        # 见 https://www.cnblogs.com/limanjihe/p/10014142.html
         self.fvec=n.fft.fftshift(n.fft.fftfreq(self.n_samples_per_block,
                                                d=1.0/float(self.sample_rate)))+self.center_freq
     def __str__(self):
